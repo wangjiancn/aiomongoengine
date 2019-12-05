@@ -1,7 +1,7 @@
 
 
 
-from .fields.base_field import BaseField
+from .base_field import BaseField
 
 
 class FloatField(BaseField):

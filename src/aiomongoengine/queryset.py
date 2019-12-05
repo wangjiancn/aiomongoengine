@@ -481,7 +481,7 @@ class QuerySet(object):
         In order to query a different database, please specify the `alias` of the database to query.
         '''
 
-        from import Q
+        from .query_builder.node import Q
 
         if not kwargs:
             raise RuntimeError(
