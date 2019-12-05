@@ -34,7 +34,7 @@ setup(
     packages=find_packages("src"),
     package_dir={"": "src"},
     include_package_data=True,
-    python_requires=">=3.5, !=3.5.0, !=3.5.1",
+    python_requires=">=3.7",
     install_requires=[
         "motor>=2.0.0",
         "arrow>=0.15.1",

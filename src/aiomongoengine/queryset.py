@@ -13,7 +13,7 @@ from tornado.concurrent import return_future
 from easydict import EasyDict as edict
 from bson.objectid import ObjectId
 
-from  import ASCENDING
+from pymongo import ASCENDING
 from .aggregation.base import Aggregation
 from .connection import get_connection
 from .errors import (
@@ -25,7 +25,7 @@ from .errors import (
 from .query_builder.field_list import QueryFieldList
 
 if TYPE_CHECKING:
-    from  import Document
+    from aiomongoengine import Document
 
 DEFAULT_LIMIT = 1000
 
@@ -481,7 +481,7 @@ class QuerySet(object):
         In order to query a different database, please specify the `alias` of the database to query.
         '''
 
-        from  import Q
+        from import Q
 
         if not kwargs:
             raise RuntimeError(
