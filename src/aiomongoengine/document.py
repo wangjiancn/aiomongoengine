@@ -362,7 +362,8 @@ class BaseDocument(object):
 
     @classmethod
     def get_fields(cls, name, fields=None):
-        from  import EmbeddedDocumentField, ListField
+        from .fields.embedded_document_field import EmbeddedDocumentField
+        from .fields.list_field import ListField
         from .fields.dynamic_field import DynamicField
 
         if fields is None:
