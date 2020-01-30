@@ -41,7 +41,7 @@ setup(
         "easydict"
     ],
     extras_require={
-        'dev': ['pytest', 'coverage', 'pytest-asyncio']
+        'dev': ['pytest', 'coverage', 'pytest-asyncio', 'autopep8']
     },
     keywords=['mongoengine', 'asyncio', 'mongo']
 )
