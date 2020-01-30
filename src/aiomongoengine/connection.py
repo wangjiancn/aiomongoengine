@@ -1,10 +1,4 @@
-
-
-
-# code adapted from https://github.com/MongoEngine/mongoengine/blob/master/mongoengine/connection.py
-
 import sys
-
 
 try:
     from motor.motor_asyncio import AsyncIOMotorClient
@@ -89,7 +83,6 @@ def get_connection(alias=DEFAULT_CONNECTION_NAME, db=None):
             "Cannot connect to database %s :\n%s" % (alias, exc_info[1]))
         raise err
 
-    database = None
     if db is None:
         database = getattr(_connections[alias], _default_dbs[alias])
     else:
