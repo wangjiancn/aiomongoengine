@@ -4,7 +4,7 @@ from .base_field import BaseField
 
 
 class ObjectIdField(BaseField):
-    '''
+    """
     Field responsible for storing object ids.
 
     Usage:
@@ -12,7 +12,7 @@ class ObjectIdField(BaseField):
     .. testcode:: modeling_fields
 
         objectid = ObjectIdField(required=True)
-    '''
+    """
 
     def validate(self, value):
         return value is None or isinstance(value, ObjectId)
