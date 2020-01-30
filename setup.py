@@ -4,14 +4,13 @@ import re
 from setuptools import find_packages
 from setuptools import setup
 
-
 with io.open("src/aiomongoengine/__init__.py", "rt", encoding="utf8") as f:
     version = re.search(r'__version__ = "(.*?)"', f.read()).group(1)
 
 setup(
     name="aiomongoengine",
     version=version,
-    url="",
+    url="https://github.com/wangjiancn/aiomongoengine",
     project_urls={
         "Documentation": "",
         "Code": "",
@@ -24,24 +23,25 @@ setup(
     maintainer_email="smartpython@outlook.com",
     description="mongoengine wrapper for asyncio",
     classifiers=[
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
-        "Topic :: Software Development :: Libraries :: Application Frameworks",
-        "Topic :: Software Development :: Libraries :: Python Modules",
     ],
     packages=find_packages("src"),
     package_dir={"": "src"},
     include_package_data=True,
-    python_requires=">=3.7",
+    python_requires=">=3.6",
     install_requires=[
         "motor>=2.0.0",
         "arrow>=0.15.1",
         "tornado==5.1.1",
-        "pymongo==3.9,<4",
+        "pymongo>=3.10,<4",
         "six",
+        "typing-extensions",
         "easydict"
     ],
+    extras_require={
+        'dev': ['pytest', 'coverage', 'pytest-asyncio']
+    },
     keywords=['mongoengine', 'asyncio', 'mongo']
 )
