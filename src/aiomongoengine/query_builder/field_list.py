@@ -9,7 +9,8 @@ class QueryFieldList(object):
     EXCLUDE = 0
 
     def __init__(
-        self, fields=None, value=ONLY, always_include=None, _only_called=False
+            self, fields=None, value=ONLY, always_include=None,
+            _only_called=False
     ):
         '''
         The QueryFieldList builder
@@ -74,11 +75,6 @@ class QueryFieldList(object):
             self._only_called = True
         return self
 
-    # python2
-    def __nonzero__(self):
-        return bool(self.fields)
-
-    # python3
     def __bool__(self):
         return bool(self.fields)
 
@@ -94,10 +90,10 @@ class QueryFieldList(object):
         return field_list
 
     def to_query(self, document):
-        ''' Transform to query using db names for fields
+        """ Transform to query using db names for fields
 
         :param document - class of the document
-        '''
+        """
         return transform_field_list_query(document, self.as_dict())
 
     def reset(self):
