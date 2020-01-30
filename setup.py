@@ -12,9 +12,8 @@ setup(
     version=version,
     url="https://github.com/wangjiancn/aiomongoengine",
     project_urls={
-        "Documentation": "",
-        "Code": "",
-        "Issue tracker": "",
+        "Code": "https://github.com/wangjiancn/aiomongoengine",
+        "Issue tracker": "https://github.com/wangjiancn/aiomongoengine/issues"
     },
     license="MIT",
     author="wangjiancn",
