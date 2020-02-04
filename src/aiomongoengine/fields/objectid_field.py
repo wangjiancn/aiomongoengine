@@ -16,3 +16,15 @@ class ObjectIdField(BaseField):
 
     def validate(self, value):
         return value is None or isinstance(value, ObjectId)
+
+    def get_value(self, value):
+        if isinstance(value, str):
+            return ObjectId(str)
+        elif isinstance(value, ObjectId):
+            return value
+
+    def to_son(self, value):
+        if isinstance(value, str):
+            return ObjectId(str)
+        else:
+            return value
