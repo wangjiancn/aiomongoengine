@@ -1,4 +1,5 @@
 import operator
+from typing import Any
 from typing import List
 from typing import Type
 from typing import TYPE_CHECKING
@@ -96,7 +97,9 @@ class QuerySet(object):
         new_qs = self.__class__(klass=self.__klass__)
         return new_qs
 
-    async def create(self, alias: str = None, **kwargs) -> 'Document':
+    async def create(self,
+                     alias: str = None,
+                     **kwargs) -> Union['Document', Any]:
         """ Creates and saved a new instance of the document. """
         document = self.__klass__(**kwargs)
         await document.save(alias=alias)
@@ -122,7 +125,7 @@ class QuerySet(object):
     async def insert(self,
                      doc_or_docs: Union['Document', List['Document']],
                      alias: str = None
-                     ):
+                     ) -> Union['Document', Any, List[Union['Document', Any]]]:
         """ Inserts all doc_or_docs passed to this method in one go. """
 
         is_valid = True
@@ -177,7 +180,7 @@ class QuerySet(object):
 
     async def update_or_create(self, definition, alias: str = None):
         """bulk update document, if not exists then create. """
-        return await self.update(definition, alias=alias, upsert=True)
+        return await self.update(**definition, alias=alias, upsert=True)
 
     async def delete(self, alias: str = None):
         """ Removes all instances of this document that match the specified \
@@ -188,15 +191,15 @@ class QuerySet(object):
     async def remove(self, instance=None, alias: str = None):
         if instance is not None:
             if hasattr(instance, 'id') and instance.id:
-                await self.coll(alias).delete_one({'_id': instance.id})
+                return await self.coll(alias).delete_one({'_id': instance.id})
         else:
             if self._filters:
                 remove_filters = self.get_query_from_filters(self._filters)
-                await self.coll(alias).delete_many(remove_filters)
+                return await self.coll(alias).delete_many(remove_filters)
             else:
-                await self.coll(alias).delete_many({})
+                return await self.coll(alias).delete_many({})
 
-    def only(self, *fields):
+    def only(self, *fields) -> 'QuerySet':
         """Load only a subset of this document's fields.
 
         :param fields: fields to include
@@ -211,7 +214,7 @@ class QuerySet(object):
 
         return self.fields(True, **only_fields)
 
-    def exclude(self, *fields):
+    def exclude(self, *fields) -> 'QuerySet':
         """Opposite to `.only()`, exclude some document's fields. """
 
         exclude_fields = {}
@@ -223,7 +226,7 @@ class QuerySet(object):
 
         return self.fields(**exclude_fields)
 
-    def fields(self, _only_called=False, **kwargs):
+    def fields(self, _only_called=False, **kwargs) -> 'QuerySet':
         """Manipulate how you load this document's fields.
 
         Used by `.only()` and `.exclude()` to manipulate which fields to
@@ -289,7 +292,7 @@ class QuerySet(object):
 
         return self
 
-    def all_fields(self):
+    def all_fields(self) -> 'QuerySet':
         """Include all fields.
 
         Reset all previously calls of `.only()` or `.exclude().`
@@ -304,7 +307,7 @@ class QuerySet(object):
 
         return self
 
-    async def get(self, alias: str = None, **kwargs):
+    async def get(self, alias: str = None, **kwargs) -> Union['Document', Any]:
         """ Gets a single item of the current queryset collection using it's id.
 
         In order to query a different database, please specify the `alias` \
@@ -327,10 +330,10 @@ class QuerySet(object):
             raise MultipleObjectsReturned
         if count == 0:
             raise DoesNotExist
-        obj = await self.new().filter(**kwargs).first()
+        obj = await self.new().filter(**kwargs).first(alias=alias)
         return obj
 
-    def filter(self, *arguments, **kwargs):
+    def filter(self, *arguments, **kwargs) -> 'QuerySet':
         """ Filters a queryset in order to produce a different set of document \
         from subsequent queries. """
 
@@ -352,7 +355,7 @@ class QuerySet(object):
                     self._filters = Q(**kwargs)
         return self
 
-    def filter_not(self, *arguments, **kwargs):
+    def filter_not(self, *arguments, **kwargs) -> 'QuerySet':
         """ Filters a queryset to negate all the filters passed in subsequent \
         queries. """
 
@@ -364,13 +367,13 @@ class QuerySet(object):
 
         return self
 
-    def skip(self, skip: int):
+    def skip(self, skip: int) -> 'QuerySet':
         """ Skips N documents before returning in subsequent queries. """
 
         self._skip = skip
         return self
 
-    async def first(self, alias: str = None) -> Union[None, 'Document']:
+    async def first(self, alias: str = None) -> Union[None, 'Document', Any]:
         """ Limits the number of documents to return in subsequent queries. """
 
         cursor = self._get_find_cursor(alias=alias)
@@ -401,7 +404,7 @@ class QuerySet(object):
         self._order_fields.extend(_raw_order_fields)
         return self
 
-    async def find_all(self, alias: str = None) -> list:
+    async def find_all(self, alias: str = None) -> Union[list, None]:
         """ Returns a list of items in the current queryset collection that \
         match specified filters (if any). """
 
@@ -425,6 +428,12 @@ class QuerySet(object):
                          limit: int = 10,
                          offset: int = 0,
                          alias: str = None) -> PaginationDict:
+
+        if not isinstance(limit, int):
+            limit = int(limit)
+        if not isinstance(offset, int):
+            offset = int(offset)
+
         count = await self.count()
         has_next = count > (limit + offset)
         has_previous = offset > 0

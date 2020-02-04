@@ -20,6 +20,8 @@ from .utils import parse_indexes
 if TYPE_CHECKING:
     from bson import ObjectId
     from motor.core import AgnosticCollection
+    from .types import DocumentType
+    from .types import DocumentTypeList
 
 AUTHORIZED_FIELDS = [
     '_id', '_data', '_reference_loaded_fields', 'is_partly_loaded'
@@ -179,7 +181,7 @@ class Document(BaseDocument, metaclass=DocumentMetaClass):
 
     async def save(self,
                    alias: str = None,
-                   upsert: bool = False) -> Document:
+                   upsert: bool = False) -> DocumentType:
         """ Creates or updates the current instance of this document. """
         if self.is_partly_loaded:
             msg = (
@@ -203,6 +205,7 @@ class Document(BaseDocument, metaclass=DocumentMetaClass):
             else:
                 ret = await self._get_collection(alias).insert_one(doc)
                 self.id = ret.inserted_id
+            self._data.update(doc)
             return self
 
     async def update(self, **kwargs):
@@ -236,5 +239,5 @@ class Document(BaseDocument, metaclass=DocumentMetaClass):
         return self._data
 
     @classmethod
-    def from_dict(cls, doc: dict) -> 'Document':
+    def from_dict(cls, doc: dict) -> Union['Document']:
         return cls(**doc)
