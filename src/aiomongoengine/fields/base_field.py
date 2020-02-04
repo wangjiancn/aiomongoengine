@@ -1,6 +1,6 @@
-from typing import Union
-from typing import Callable
 from typing import Any
+from typing import Callable
+from typing import Union
 
 
 class BaseField(object):
@@ -59,6 +59,12 @@ class BaseField(object):
         return value is None
 
     def get_value(self, value):
+        if value is None:
+            if self.null:
+                pass
+            elif self.default is not None:
+                value = self.default() if callable(
+                    self.default) else self.default
         return value
 
     def to_son(self, value):
@@ -68,16 +74,11 @@ class BaseField(object):
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        return instance._data.get(self.name)
+        value = instance._data.get(self.db_field)
+        return self.get_value(value)
 
     def __set__(self, instance, value):
-        if value is None:
-            if self.null:
-                value = None
-            elif self.default is not None:
-                value = self.default() if callable(
-                    self.default) else self.default
-        instance._data[self.name] = value
+        instance._data[self.db_field] = self.get_value(value)
 
     def to_query(self, value):
         return self.to_son(value)
