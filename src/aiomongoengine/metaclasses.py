@@ -12,7 +12,7 @@ from .fields import ObjectIdField
 if TYPE_CHECKING:
     from .document import Document
 
-registered_collections: Dict[str, Any] = {}
+registered_collections: Dict[str, 'Document'] = {}
 
 
 class Meta(dict):

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from typing import Union
 
 from aiomongoengine.errors import PartlyLoadedDocumentError
+from aiomongoengine.query.queryset import QuerySet
 
 from .connection import get_connection
 from .errors import InvalidDocumentError
@@ -14,14 +15,12 @@ from .fields import BaseField
 from .fields.dynamic_field import DynamicField
 from .metaclasses import DocumentMetaClass
 from .metaclasses import registered_collections
-from aiomongoengine.query.queryset import QuerySet
 from .utils import parse_indexes
 
 if TYPE_CHECKING:
     from bson import ObjectId
     from motor.core import AgnosticCollection
-    from .types import DocumentType
-    from .types import DocumentTypeList
+    from motor.core import AgnosticClient
 
 AUTHORIZED_FIELDS = [
     '_id', '_data', '_reference_loaded_fields', 'is_partly_loaded'
@@ -53,6 +52,7 @@ class BaseDocument(object):
     _db_field_map: Dict[str, str]
     _fields_ordered: Tuple[str]
     _reverse_db_field_map: Dict[str, str]
+    _collection: AgnosticClient
     __collection__: str
 
     def __init__(self,
@@ -76,6 +76,14 @@ class BaseDocument(object):
                 self._fields[key] = DynamicField()
                 setattr(self, key, DynamicField())
             setattr(self, key, value)
+
+    @classmethod
+    def close(cls, connection=None):
+        """ Set _collection None when call `aiomongoengine.disconnect()` """
+        if cls._collection is None:
+            return
+        if cls._collection.database.client == connection:
+            cls._collection = None
 
     @classmethod
     def _get_collection(cls, alias: str = None) -> AgnosticCollection:
@@ -181,7 +189,7 @@ class Document(BaseDocument, metaclass=DocumentMetaClass):
 
     async def save(self,
                    alias: str = None,
-                   upsert: bool = False) -> DocumentType:
+                   upsert: bool = False):
         """ Creates or updates the current instance of this document. """
         if self.is_partly_loaded:
             msg = (
