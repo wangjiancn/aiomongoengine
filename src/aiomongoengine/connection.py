@@ -1,9 +1,8 @@
 import sys
+from typing import NoReturn
 
-try:
-    from motor.motor_asyncio import AsyncIOMotorClient
-except ImportError:
-    pass
+from aiomongoengine.metaclasses import registered_collections
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from .database import Database
 
@@ -37,19 +36,25 @@ def cleanup():
     _default_dbs = {}
 
 
-def disconnect(alias=DEFAULT_CONNECTION_NAME):
+def disconnect(alias: str = DEFAULT_CONNECTION_NAME,
+               with_register_document: bool = False) -> NoReturn:
     global _connections
     global _connection_settings
     global _default_dbs
 
     if alias in _connections:
-        _connections[alias].close()
+        connection = _connections[alias]
+        if with_register_document:
+            for document in registered_collections.values():
+                document.close(connection)
+        connection.close()
         del _connections[alias]
         del _connection_settings[alias]
         del _default_dbs[alias]
 
 
-def get_connection(alias=DEFAULT_CONNECTION_NAME, db=None):
+def get_connection(alias: str = DEFAULT_CONNECTION_NAME,
+                   db: str = None) -> Database:
     global _connections
     global _default_dbs
 
@@ -90,7 +95,9 @@ def get_connection(alias=DEFAULT_CONNECTION_NAME, db=None):
     return Database(_connections[alias], database)
 
 
-def connect(db, alias=DEFAULT_CONNECTION_NAME, **kwargs):
+def connect(db: str,
+            alias: str = DEFAULT_CONNECTION_NAME,
+            **kwargs) -> Database:
     """Connect to the database specified by the 'db' argument.
 
     Connection settings may be provided here as well if the database is not
