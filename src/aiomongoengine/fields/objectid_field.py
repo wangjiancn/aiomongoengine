@@ -25,6 +25,6 @@ class ObjectIdField(BaseField):
 
     def to_son(self, value):
         if isinstance(value, str):
-            return ObjectId(str)
+            return ObjectId(value)
         else:
             return value
