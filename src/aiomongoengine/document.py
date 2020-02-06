@@ -143,7 +143,7 @@ class BaseDocument(object):
                 self.__class__.__name__
             ))
         field = self._fields[name]
-        value = field.get_value(self._data.get(name, None))
+        value = field.get_value(self._data.get(field.db_field, None))
         return value
 
     @classmethod
