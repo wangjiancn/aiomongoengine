@@ -7,7 +7,7 @@ from aiomongoengine import Document
 from aiomongoengine import fields
 
 
-class User(Document):
+class TestUser(Document):
     name = fields.StringField(default='', unique=True)
     age = fields.IntField()
     like = fields.ListField(fields.StringField())
@@ -15,7 +15,7 @@ class User(Document):
 
 @pytest.fixture(scope='session', autouse=True)
 def user_cls() -> Type[Document]:
-    return User
+    return TestUser
 
 
 @pytest.fixture(scope='session', autouse=True)
@@ -30,7 +30,7 @@ async def mock_users(user_cls):
         user_cls(name='Jason Smith', age=32, like=['swim', 'run']),
         user_cls(name='Lindsay Thompson', age=34, like=['swim', 'run']),
         user_cls(name='Lisa Brown', age=38, like=['swim', 'run']),
-        user_cls(name='Stephanie Flores', age=44, like=['swim', 'run'])
+        user_cls(name='Stephanie Flores', age=44)
     ]
     await user_cls.objects.insert(users)
     return users
