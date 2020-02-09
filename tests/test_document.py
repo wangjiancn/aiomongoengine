@@ -1,11 +1,6 @@
-import re
-
 import pytest
-from aiomongoengine import connect
-from aiomongoengine import Document
 from aiomongoengine import get_collection_list
 from aiomongoengine import get_collections
-from aiomongoengine import fields
 
 
 def test_get_collection_list(user_cls):
