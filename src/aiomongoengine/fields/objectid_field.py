@@ -17,6 +17,6 @@ class ObjectIdField(BaseField):
     def get_value(self, value):
         value = super().get_value(value)
         if isinstance(value, str):
-            return ObjectId(str)
+            return ObjectId(value)
         elif isinstance(value, ObjectId):
             return value
