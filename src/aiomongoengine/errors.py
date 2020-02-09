@@ -1,6 +1,52 @@
 import re
 
 
+class ValidationError(AssertionError):
+    errors = {}
+    field_name = None
+
+    def __init__(self, message='', **kwargs):
+        super().__init__(message)
+        self.errors = kwargs.get('errors', {})
+        self.field_name = kwargs.get('field_name')
+        self.message = message
+
+    def __str__(self):
+        return str(self.message)
+
+    def __repr__(self):
+        return f'{self.__class__.__name__} {self.message}'
+
+    def to_dict(self):
+        """Returns a dictionary of all errors within a document
+
+        Keys are field names or list indices and values are the
+        validation error messages, or a nested dictionary of
+        errors for an embedded document or list.
+        """
+
+        def build_dict(source):
+            errors_dict = {}
+            if isinstance(source, dict):
+                for field_name, error in source.items():
+                    errors_dict[field_name] = build_dict(error)
+            elif isinstance(source, ValidationError) and source.errors:
+                return build_dict(source.errors)
+            else:
+                return str(source)
+
+            return errors_dict
+
+        if not self.errors:
+            return {}
+
+        return build_dict(self.errors)
+
+
+class ConnectionError(Exception):
+    pass
+
+
 class InvalidDocumentError(ValueError):
     pass
 
