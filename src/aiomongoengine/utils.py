@@ -85,6 +85,17 @@ INDEX_TYPE_MAP = {
 }
 
 
+def camel_lowercase(camel_string):
+    """ Convert camel string to lowercase. """
+    lowercase_string = camel_string[0].lower()
+    for s in camel_string[1:]:
+        if s.isupper():
+            lowercase_string += f'_{s.lower()}'
+        else:
+            lowercase_string += s
+    return lowercase_string
+
+
 def parse_single_index(index_str) -> Tuple[str, Union[str, int]]:
     index_type = INDEX_TYPE_MAP.get(index_str[0])
     if index_type:

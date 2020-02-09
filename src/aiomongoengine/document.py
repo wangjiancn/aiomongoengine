@@ -27,23 +27,6 @@ AUTHORIZED_FIELDS = [
 ]
 
 
-def get_collections() -> Dict[str, Document]:
-    """获取所有集合
-
-    :return:(dict) name/Document 键值对
-    """
-    return registered_collections
-
-
-def get_collection_list() -> List[Document]:
-    """获取所有集合组成的列表
-
-    :return:(list) [Document1,Document2,...]
-    """
-    collection_list = list(registered_collections.values())
-    return collection_list
-
-
 class BaseDocument(object):
     id: ObjectId
     objects: QuerySet

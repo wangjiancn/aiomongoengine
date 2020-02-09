@@ -4,7 +4,9 @@ from typing import Tuple
 from typing import TYPE_CHECKING
 
 from aiomongoengine.query.queryset import QuerySet
+from aiomongoengine.utils import camel_lowercase
 
+from .connection import registered_collections
 from .errors import InvalidDocumentError
 from .fields import BaseField
 from .fields import ObjectIdField

@@ -1,21 +1,36 @@
 import sys
+from typing import Dict
+from typing import List
 from typing import NoReturn
+from typing import TYPE_CHECKING
+from typing import Union
 
-from aiomongoengine.metaclasses import registered_collections
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from .database import Database
+from .errors import ConnectionError
+
+if TYPE_CHECKING:
+    from .document import Document
 
 DEFAULT_CONNECTION_NAME = 'default'
 
+registered_collections: Dict[str, 'Document'] = {}
+_connection_settings: Dict[str, Dict[str, Union[str, int]]] = {}
+_connections: Dict[str, 'AsyncIOMotorClient'] = {}
+_default_dbs: Dict[str, 'AsyncIOMotorClient'] = {}
 
-class ConnectionError(Exception):
-    pass
+
+def get_collections() -> Dict[str, 'Document']:
+    """ Return all registered document as Dict[class_name,'Document']. """
+    return registered_collections
 
 
-_connection_settings = {}
-_connections = {}
-_default_dbs = {}
+def get_collection_list() -> List['Document']:
+    """ Return all registered document as List. """
+
+    collection_list = list(set(registered_collections.values()))
+    return collection_list
 
 
 def register_connection(db, alias, **kwargs):
@@ -97,7 +112,7 @@ def get_connection(alias: str = DEFAULT_CONNECTION_NAME,
 
 def connect(db: str,
             alias: str = DEFAULT_CONNECTION_NAME,
-            **kwargs) -> Database:
+            **kwargs) -> 'Database':
     """Connect to the database specified by the 'db' argument.
 
     Connection settings may be provided here as well if the database is not
