@@ -211,7 +211,7 @@ class Document(BaseDocument, metaclass=DocumentMetaClass):
         if validate:
             self.validate()
 
-        doc = self.to_son()
+        doc = self.to_son(on_save=True)
         _id = doc.pop('_id', None)
         if _id is not None:
             await self._get_collection(alias).find_one_and_update(
