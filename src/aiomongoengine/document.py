@@ -1,26 +1,24 @@
 from __future__ import annotations
 
 from typing import Dict
-from typing import List
+from typing import NoReturn
 from typing import Tuple
 from typing import TYPE_CHECKING
 from typing import Union
 
 from aiomongoengine.errors import PartlyLoadedDocumentError
+from aiomongoengine.errors import ValidationError
 from aiomongoengine.query.queryset import QuerySet
 
 from .connection import get_connection
-from .errors import InvalidDocumentError
-from .fields import BaseField
-from .fields.dynamic_field import DynamicField
 from .metaclasses import DocumentMetaClass
-from .metaclasses import registered_collections
 from .utils import parse_indexes
 
 if TYPE_CHECKING:
     from bson import ObjectId
     from motor.core import AgnosticCollection
     from motor.core import AgnosticClient
+    from .fields.base_field import BaseField
 
 AUTHORIZED_FIELDS = [
     '_id', '_data', '_reference_loaded_fields', 'is_partly_loaded'
@@ -31,11 +29,12 @@ class BaseDocument(object):
     id: ObjectId
     objects: QuerySet
     _meta: dict
-    _fields: Dict[str, BaseField]
+    _fields: Dict[str, 'BaseField']
     _db_field_map: Dict[str, str]
     _fields_ordered: Tuple[str]
     _reverse_db_field_map: Dict[str, str]
     _collection: AgnosticClient
+    _class_name: str
     __collection__: str
 
     def __init__(self,
@@ -49,6 +48,7 @@ class BaseDocument(object):
         reference fields if any. Default: None.
         :param kw: pairs of fields of the document and their values
         """
+        from .fields.dynamic_field import DynamicField
 
         self._data = {}  # storage document field and value
         self.is_partly_loaded = _is_partly_loaded
@@ -56,8 +56,8 @@ class BaseDocument(object):
 
         for key, value in kw.items():
             if key not in self._fields:
-                self._fields[key] = DynamicField()
-                setattr(self, key, DynamicField())
+                self._fields[key] = DynamicField(db_field=key)
+                setattr(self, key, DynamicField(db_field=key))
             setattr(self, key, value)
 
     @classmethod
@@ -82,17 +82,16 @@ class BaseDocument(object):
 
     @classmethod
     def from_son(cls,
-                 dic, _is_partly_loaded=False,
+                 dic,
+                 _is_partly_loaded=False,
                  _reference_loaded_fields=None):
         field_values = {}
-        _object_id = dic.pop('_id', None)
         for name, value in dic.items():
             field = cls.get_field_by_db_name(name)
             if field:
                 field_values[field.name] = field.from_son(value)
             else:
                 field_values[name] = value
-        field_values["id"] = _object_id
 
         return cls(
             _is_partly_loaded=_is_partly_loaded,
@@ -100,12 +99,17 @@ class BaseDocument(object):
             **field_values
         )
 
-    def to_son(self):
-        """instance to bson"""
-        data = dict()
+    def to_son(self, fields=None, on_save=False) -> dict:
+        """ Instance to bson"""
+        fields = fields or []
+        root_fields = {f.split('.')[0] for f in fields}
+
+        data = {}
 
         for name, field in self._fields.items():
-            value = self.get_field_value(name)
+            if root_fields and name not in root_fields:
+                continue
+            value = self.get_field_value(name, on_save=on_save)
             if field.sparse and value is None:
                 continue
             data[field.db_field] = field.to_son(value)
@@ -113,32 +117,49 @@ class BaseDocument(object):
             del data['_id']
         return data
 
-    def validate(self) -> bool:
-        """validate all filed"""
-        return self.validate_fields()
+    def validate(self) -> NoReturn:
+        """validate all field"""
+        errors = {}
 
-    def validate_fields(self) -> bool:
         for name, field in self._fields.items():
             value = self.get_field_value(name)
-            if field.required and field.is_empty(value):
-                raise InvalidDocumentError("Field '%s' is required." % name)
-            if not field.validate(value):
-                raise InvalidDocumentError("Field '%s' must be valid." % name)
+            if not field.is_empty(value):
+                try:
+                    field.validate(value)
+                except ValidationError as error:
+                    errors[field.name] = error.errors or error
+                except (ValueError, AssertionError, AttributeError) as error:
+                    errors[field.name] = error
+            elif field.required:
+                errors[field.name] = ValidationError(
+                    message="Field is required", field_name=field.name
+                )
+        if errors:
+            pk = "None"
+            if hasattr(self, "id"):
+                pk = self.id
+            message = f"ValidationError {self._class_name}:{pk}"
+            raise ValidationError(message=message, errors=errors)
 
-        return True
-
-    def get_field_value(self, name):
+    def get_field_value(self, name, on_save=False):
+        """ Get field's value. """
         if name not in self._fields:
             raise ValueError("Field %s not found in instance of %s." % (
                 name,
                 self.__class__.__name__
             ))
         field = self._fields[name]
-        value = field.get_value(self._data.get(field.db_field, None))
+        if field.db_field in self._data:
+            value = self._data.get(field.db_field)
+        else:
+            value = field.get_value(None)
+        if on_save:
+            value = field.get_db_prep_value(value)
         return value
 
     @classmethod
-    def get_field_by_db_name(cls, name) -> Union[BaseField, None]:
+    def get_field_by_db_name(cls, name) -> Union['BaseField', None]:
+        """ Get field by BaseField.db_field"""
         for field_name, field in cls._fields.items():
             if name == field.db_field or name.lstrip("_") == field.db_field:
                 return field
@@ -146,6 +167,8 @@ class BaseDocument(object):
 
     @classmethod
     def get_fields(cls, name, fields=None):
+
+        from .fields.dynamic_field import DynamicField
 
         if fields is None:
             fields = []
@@ -171,6 +194,7 @@ class Document(BaseDocument, metaclass=DocumentMetaClass):
     meta = {'abstract': True}
 
     async def save(self,
+                   validate: bool = True,
                    alias: str = None,
                    upsert: bool = False):
         """ Creates or updates the current instance of this document. """
@@ -184,20 +208,22 @@ class Document(BaseDocument, metaclass=DocumentMetaClass):
                 msg.format(self.__class__.__name__)
             )
 
-        if self.validate():
-            doc = self.to_son()
-            _id = doc.pop('_id', None)
-            if _id is not None:
-                await self._get_collection(alias).find_one_and_update(
-                    {'_id': _id},
-                    {'$set': doc},
-                    upsert=upsert
-                )
-            else:
-                ret = await self._get_collection(alias).insert_one(doc)
-                self.id = ret.inserted_id
-            self._data.update(doc)
-            return self
+        if validate:
+            self.validate()
+
+        doc = self.to_son()
+        _id = doc.pop('_id', None)
+        if _id is not None:
+            await self._get_collection(alias).find_one_and_update(
+                {'_id': _id},
+                {'$set': doc},
+                upsert=upsert
+            )
+        else:
+            ret = await self._get_collection(alias).insert_one(doc)
+            self.id = ret.inserted_id
+        self._data.update(doc)
+        return self
 
     async def update(self, **kwargs):
         return await self.objects.filter(id=self.id).update(**kwargs)

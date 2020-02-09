@@ -4,79 +4,14 @@ from typing import Tuple
 from typing import TYPE_CHECKING
 from typing import Union
 
-import sys
 from pymongo import ASCENDING
 from pymongo import DESCENDING
 from pymongo import HASHED
 from pymongo import IndexModel
 from pymongo import TEXT
 
-try:
-    from ujson import loads, dumps
-
-
-    def serialize(value):
-        return dumps(value)
-
-
-    def deserialize(value):
-        return loads(value)
-
-except ImportError:
-    from json import loads, dumps
-    from bson import json_util
-
-
-    def serialize(value):
-        return dumps(value, default=json_util.default)
-
-
-    def deserialize(value):
-        return loads(value, object_hook=json_util.object_hook)
-
 if TYPE_CHECKING:
     from .document import Document
-
-
-def get_class(module_name, klass=None):
-    if '.' not in module_name and klass is None:
-        raise ImportError("Can't find class %s." % module_name)
-
-    try:
-        module_parts = module_name.split('.')
-
-        if klass is None:
-            module_name = '.'.join(module_parts[:-1])
-            klass_name = module_parts[-1]
-        else:
-            klass_name = klass
-
-        module = __import__(module_name)
-
-        if '.' in module_name:
-            for part in module_name.split('.')[1:]:
-                module = getattr(module, part)
-
-        return getattr(module, klass_name)
-    except AttributeError:
-        err = sys.exc_info()
-        raise ImportError("Can't find class %s (%s)." %
-                          (module_name, str(err)))
-
-
-"""
-[
-            'title',
-            '$title',  # text index
-            '#title',  # hashed index
-            ('title', '-rating'),
-            ('category', '_cls'),
-            {
-                'fields': ['created'],
-                'expireAfterSeconds': 3600
-            }
-        ]
-"""
 
 INDEX_TYPE_MAP = {
     '$': TEXT,
@@ -122,3 +57,47 @@ def parse_indexes(indexes: list,
                     IndexModel(index_fields, **index_clone)
                 )
     return index_model_list
+
+
+_class_registry_cache = {}
+_field_list_cache = []
+
+
+def _import_class(cls_name):
+    """Cache mechanism for imports.
+
+    Due to complications of circular imports aiomongoengine needs to do lots of
+    inline imports in functions.  This is inefficient as classes are
+    imported repeated throughout the aiomongoengine code.  This is
+    compounded by some recursive functions requiring inline imports.
+
+    :mod:`aiomongoengine.common` provides a single point to import all these
+    classes.  Circular imports aren't an issue as it dynamically imports the
+    class when first needed.  Subsequent calls to the
+    :func:`~aiomongoengine.common._import_class` can then directly retrieve the
+    class from the :data:`aiomongoengine.common._class_registry_cache`.
+    """
+    if cls_name in _class_registry_cache:
+        return _class_registry_cache.get(cls_name)
+
+    doc_classes = ("Document", "BaseDocument")
+
+    # Field Classes
+    if not _field_list_cache:
+        from aiomongoengine.fields import __all__ as fields
+        _field_list_cache.extend(fields)
+
+    field_classes = _field_list_cache
+
+    if cls_name in doc_classes:
+        from aiomongoengine import document as module
+        import_classes = doc_classes
+    elif cls_name in field_classes:
+        from aiomongoengine import fields as module
+        import_classes = field_classes
+    else:
+        raise ValueError("No import set for: %s" % cls_name)
+    for cls in import_classes:
+        _class_registry_cache[cls] = getattr(module, cls)
+
+    return _class_registry_cache.get(cls_name)

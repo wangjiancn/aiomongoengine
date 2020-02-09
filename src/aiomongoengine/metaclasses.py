@@ -1,5 +1,3 @@
-from typing import Any
-from typing import Dict
 from typing import Tuple
 from typing import TYPE_CHECKING
 
@@ -8,13 +6,11 @@ from aiomongoengine.utils import camel_lowercase
 
 from .connection import registered_collections
 from .errors import InvalidDocumentError
-from .fields import BaseField
+from .fields.base_field import BaseField
 from .fields import ObjectIdField
 
 if TYPE_CHECKING:
     from .document import Document
-
-registered_collections: Dict[str, 'Document'] = {}
 
 
 class Meta(dict):
@@ -120,15 +116,10 @@ class DocumentMetaClass(type):
             attrs['id'] = doc_fields[id_name]
 
         if not meta.get('abstract'):
-            cls_name = name
-            new_cls_name = cls_name[0].lower()
-            for s in cls_name[1:]:
-                if s.isupper():
-                    new_cls_name += f'_{s.lower()}'
-                else:
-                    new_cls_name += s
-            attrs['__collection__'] = new_cls_name
+            attrs['__collection__'] = camel_lowercase(name)
+
         attrs['_collection'] = None
+        attrs['_class_name'] = name
         attrs['_meta'] = meta
         attrs['_fields'] = doc_fields
         attrs['_db_field_map'] = {k: v.db_field for k, v in doc_fields.items()}
@@ -141,9 +132,15 @@ class DocumentMetaClass(type):
         attrs['objects'] = ClassProperty(
             lambda *args, **kw: QuerySet(new_class))
 
-        new_class = super_new(mcs, name, bases, attrs)
+        new_class = super_new(mcs, name, bases, attrs)  # type: Document
+
         if hasattr(new_class, '__collection__'):
             registered_collections[new_class.__collection__] = new_class
+            registered_collections[new_class._class_name] = new_class
+
+        for field in new_class._fields.values():
+            if field.owner_document is None:
+                field.owner_document = new_class
 
         return new_class
 
