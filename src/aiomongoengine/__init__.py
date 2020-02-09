@@ -7,4 +7,4 @@ from .fields import *
 from .query_builder.node import Q
 from .query_builder.node import QNot
 
-__version__ = "0.0.1.dev1"
+__version__ = "0.0.1.dev2"
