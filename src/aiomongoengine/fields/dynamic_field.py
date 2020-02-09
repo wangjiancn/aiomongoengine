@@ -1,13 +1,8 @@
-
-
-
 from .base_field import BaseField
 
 
 class DynamicField(BaseField):
-    '''
-    Field responsible for storing dynamic arguments.
-    '''
+    """ Field responsible for storing dynamic arguments. """
 
     @property
     def name(self):

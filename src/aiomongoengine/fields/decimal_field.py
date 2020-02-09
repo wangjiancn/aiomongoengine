@@ -1,78 +1,79 @@
-
-
-
-import decimal
-
-import six
+from decimal import Decimal
+from decimal import InvalidOperation
+from decimal import ROUND_HALF_UP
+from typing import Union
 
 from .base_field import BaseField
 
 
 class DecimalField(BaseField):
-    '''
-    Field responsible for storing fixed-point decimal numbers (:py:class:`decimal.Decimal`).
+    """ Field responsible for storing fixed-point decimal numbers
+    (:py:class:`decimal.Decimal`). """
 
-    Usage:
-
-    .. testcode:: modeling_fields
-
-        import decimal
-
-        name = DecimalField(required=True, min_value=None, max_value=None, precision=2, rounding=decimal.ROUND_HALF_UP)
-
-    Available arguments (apart from those in `BaseField`):
-
-    * `min_value` - Raises a validation error if the decimal being stored is lesser than this value
-    * `max_value` - Raises a validation error if the decimal being stored is greather than this value
-    * `precision` - Number of decimal places to store.
-    * `rounding` - The rounding rule from the python decimal library:
-
-        * decimal.ROUND_CEILING (towards Infinity)
-        * decimal.ROUND_DOWN (towards zero)
-        * decimal.ROUND_FLOOR (towards -Infinity)
-        * decimal.ROUND_HALF_DOWN (to nearest with ties going towards zero)
-        * decimal.ROUND_HALF_EVEN (to nearest with ties going to nearest even integer)
-        * decimal.ROUND_HALF_UP (to nearest with ties going away from zero)
-        * decimal.ROUND_UP (away from zero)
-        * decimal.ROUND_05UP (away from zero if last digit after rounding towards zero would have been 0 or 5; otherwise towards zero)
-
-    .. note::
-
-        Decimal field stores the value as a string in MongoDB to preserve the precision.
-    '''
-
-    def __init__(self, min_value=None, max_value=None, precision=2, rounding=decimal.ROUND_HALF_UP, *args, **kw):
+    def __init__(self,
+                 min_value: Union[int, float] = None,
+                 max_value: Union[int, float] = None,
+                 force_string: bool = False,
+                 precision=2,
+                 rounding=ROUND_HALF_UP,
+                 *args, **kw):
+        """
+        :param min_value: Raises a validation error if the decimal being
+            stored is lesser than this value
+        :param max_value: Raises a validation error if the decimal being
+            stored is greater than this value
+        :param force_string: Force convert to string when save
+        :param precision: Number of decimal places to store.
+        :param rounding: The rounding rule from the python decimal library:
+            * decimal.ROUND_CEILING (towards Infinity)
+            * decimal.ROUND_DOWN (towards zero)
+            * decimal.ROUND_FLOOR (towards -Infinity)
+            * decimal.ROUND_HALF_DOWN (to nearest with ties going towards zero)
+            * decimal.ROUND_HALF_EVEN (to nearest with ties going to nearest
+                even integer)
+            * decimal.ROUND_HALF_UP (to nearest with ties going away from zero)
+            * decimal.ROUND_UP (away from zero)
+            * decimal.ROUND_05UP (away from zero if last digit after rounding
+                towards zero would have been 0 or 5; otherwise towards zero)
+        """
         super(DecimalField, self).__init__(*args, **kw)
-        self.min_value = min_value
-        if self.min_value is not None:
-            self.min_value = decimal.Decimal(min_value)
-
-        self.max_value = max_value
-        if self.max_value is not None:
-            self.max_value = decimal.Decimal(max_value)
-
-        self.precision = decimal.Decimal(".%s" % ("0" * precision))
+        self.min_value = Decimal(min_value) if min_value else None
+        self.max_value = Decimal(max_value) if min_value else None
+        self.precision = Decimal(".%s" % ("0" * precision))
         self.rounding = rounding
+        self.force_string = force_string
 
     def to_son(self, value):
-        value = decimal.Decimal(value)
-        return six.u(str(value.quantize(self.precision, rounding=self.rounding)))
+        if value is None:
+            return value
+        if self.force_string:
+            return str(self.from_son(value))
+        return float(self.from_son(value))
 
     def from_son(self, value):
-        value = decimal.Decimal(value)
+        if value is None:
+            return value
 
-        return value.quantize(self.precision, rounding=self.rounding)
+        # Convert to string for python 2.6 before casting to Decimal
+        try:
+            value = Decimal("%s" % value)
+        except (TypeError, ValueError, InvalidOperation):
+            return value
+        return value.quantize(
+            Decimal(".%s" % ("0" * self.precision)), rounding=self.rounding
+        )
 
     def validate(self, value):
-        try:
-            value = decimal.Decimal(value)
-        except:
-            return False
+        if not isinstance(value, Decimal):
+            if not isinstance(value, str):
+                value = str(value)
+            try:
+                value = Decimal(value)
+            except (TypeError, ValueError, InvalidOperation) as exc:
+                self.error("Could not convert value to decimal: %s" % exc)
 
         if self.min_value is not None and value < self.min_value:
-            return False
+            self.error("Decimal value is too small")
 
         if self.max_value is not None and value > self.max_value:
-            return False
-
-        return True
+            self.error("Decimal value is too large")

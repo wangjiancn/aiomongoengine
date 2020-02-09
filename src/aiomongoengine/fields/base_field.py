@@ -1,12 +1,16 @@
 from typing import Any
 from typing import Callable
+from typing import NoReturn
 from typing import Union
+
+from aiomongoengine.errors import ValidationError
 
 
 class BaseField(object):
     """This class is the base to all fields. This is not supposed to be used \
     directly in documents.
     """
+    name: str = None
 
     total_creation_counter = 0
 
@@ -49,27 +53,24 @@ class BaseField(object):
         self.sparse = sparse
         self.unique_with = unique_with
         self.null = null
+        self._owner_document = None
         self.__dict__.update(kwargs)
 
-    def is_empty(self, value):
-        """Indicates that the field is empty
-
-        the default is comparing the value to None
-        """
-        return value is None
-
-    def get_value(self, value):
+    def get_value(self, value) -> Any:
+        """ Get field's value from document. """
         if value is None:
             if self.null:
-                pass
+                value = None
             elif self.default is not None:
-                value = self.default() if callable(
-                    self.default) else self.default
+                if callable(self.default):
+                    value = self.default()
+                else:
+                    value = self.default
         return value
 
-    def to_son(self, value):
-        """Converts the value to the BSON representation required by motor."""
-        return value
+    def get_db_prep_value(self, value) -> Any:
+        """ Return field's value prepare for save into a database. """
+        return self.get_value(value)
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -80,13 +81,41 @@ class BaseField(object):
     def __set__(self, instance, value):
         instance._data[self.db_field] = self.get_value(value)
 
-    def to_query(self, value):
-        return self.to_son(value)
+    def is_empty(self, value) -> bool:
+        """Indicates that the field is empty
 
-    def from_son(self, value):
-        """Parses the value from the BSON representation returned from motor."""
+        the default is comparing the value to None
+        """
+        return value is None
+
+    def to_son(self, value) -> Any:
+        """Converts the value to the BSON representation required by motor."""
         return value
 
-    def validate(self, value):
-        """Returns if the specified value for the field is valid."""
-        return True
+    def from_son(self, value) -> Any:
+        """Parses the value from the BSON representation returned from motor."""
+        return self.to_son(value)
+
+    def to_query(self, value) -> Any:
+        """ Return field's for queryset. """
+        return self.to_son(value)
+
+    def validate(self, value) -> NoReturn:
+        """ Validate field's value, raise `ValidationError` when valid. """
+        pass
+
+    def error(self, message="", errors=None, field_name=None) -> NoReturn:
+        """ Raise a ValidationError."""
+        field_name = field_name or self.name or self.db_field
+        raise ValidationError(message, errors=errors, field_name=field_name)
+
+    @property
+    def owner_document(self):
+        return self._owner_document
+
+    def _set_owner_document(self, owner_document):
+        self._owner_document = owner_document
+
+    @owner_document.setter
+    def owner_document(self, owner_document):
+        self._set_owner_document(owner_document)

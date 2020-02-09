@@ -1,29 +1,29 @@
-
-
-
 from .base_field import BaseField
 
 
 class IntField(BaseField):
-    '''
-    Field responsible for storing integer values (:py:func:`int`).
-
-    Usage:
-
-    .. testcode:: modeling_fields
-
-        name = IntField(required=True, min_value=0, max_value=255)
+    """ Field responsible for storing integer values (:py:func:`int`).
 
     Available arguments (apart from those in `BaseField`):
 
     * `min_value` - Raises a validation error if the integer being stored is lesser than this value
     * `max_value` - Raises a validation error if the integer being stored is greather than this value
-    '''
+    """
 
-    def __init__(self, min_value=None, max_value=None, *args, **kw):
-        super(IntField, self).__init__(*args, **kw)
+    def __init__(self,
+                 min_value=None,
+                 max_value=None,
+                 *args,
+                 **kw):
+        super().__init__(*args, **kw)
         self.min_value = min_value
         self.max_value = max_value
+
+    def get_value(self, value) -> int:
+        value = super().get_value(value)
+        if value is None:
+            return value
+        return int(value)
 
     def to_son(self, value):
         if value is None:
@@ -36,17 +36,13 @@ class IntField(BaseField):
         return int(value)
 
     def validate(self, value):
-        if value is None:
-            return True
         try:
             value = int(value)
-        except:
-            return False
+        except (TypeError, ValueError):
+            self.error(f"`{value}` could not be converted to int")
 
         if self.min_value is not None and value < self.min_value:
-            return False
+            self.error("Integer value is too small")
 
         if self.max_value is not None and value > self.max_value:
-            return False
-
-        return True
+            self.error("Integer value is too large")
