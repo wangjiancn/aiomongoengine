@@ -1,19 +1,18 @@
+import itertools
 import operator
+import sys
 from typing import Any
+from typing import Iterable
 from typing import List
 from typing import Type
 from typing import TYPE_CHECKING
 from typing import Union
-from typing import Iterable
 
-import itertools
-import sys
-from bson.objectid import ObjectId
 from typing_extensions import TypedDict
 
 from ..errors import DoesNotExist
 from ..errors import MultipleObjectsReturned
-from ..fields import BaseField
+from ..fields.base_field import BaseField
 from ..query_builder.field_list import QueryFieldList
 from ..query_builder.node import Q
 from ..query_builder.node import QNot
@@ -71,10 +70,11 @@ class QuerySet(object):
             find_arguments['skip'] = self._skip
 
         query_filters = self.get_query_from_filters(self._filters)
+        projection = self._loaded_fields.to_query(self.__klass__)
 
         return self.coll(alias).find(
             query_filters,
-            projection=self._loaded_fields.to_query(self.__klass__),
+            projection=projection,
             **find_arguments
         )
 
@@ -113,14 +113,11 @@ class QuerySet(object):
     def validate_document(self, document: 'Document') -> bool:
         if not isinstance(document, self.__klass__):
             raise ValueError(
-                "This queryset for class '%s' can't save an instance of type\
-                 '%s'." % (
-                    self.__klass__.__name__,
-                    document.__class__.__name__,
-                )
+                f"This queryset for class '{self.__klass__._class_name}' can't"
+                f" save an instance of type'{document._class_name}'."
             )
 
-        return document.validate()
+        document.validate()
 
     async def insert(self,
                      doc_or_docs: Union['Document', List['Document']],
@@ -128,7 +125,6 @@ class QuerySet(object):
                      ) -> Union['Document', Any, List[Union['Document', Any]]]:
         """ Inserts all doc_or_docs passed to this method in one go. """
 
-        is_valid = True
         docs_to_insert = []
 
         if not isinstance(doc_or_docs, Iterable):
@@ -136,7 +132,7 @@ class QuerySet(object):
 
         for document_index, document in enumerate(doc_or_docs):
             try:
-                is_valid = is_valid and self.validate_document(document)
+                self.validate_document(document)
             except Exception:
                 err = sys.exc_info()[1]
                 raise ValueError(
@@ -144,13 +140,7 @@ class QuerySet(object):
                     f"documents you are saving failed with: {str(err)}"
                 )
 
-            if not is_valid:
-                return
-
             docs_to_insert.append(document.to_son())
-
-        if not is_valid:
-            return
 
         await self.coll(alias).insert_many(docs_to_insert)
 
@@ -259,6 +249,7 @@ class QuerySet(object):
                 title=QueryFieldList.ONLY
             ).get(...)
 
+        :param _only_called:
         :param kwargs: A dictionary identifying what to include
         """
 
@@ -272,14 +263,8 @@ class QuerySet(object):
                 value = {'$' + op: value}
 
             key = '.'.join(parts)
-            try:
-                field_name, value = self._check_valid_field_name_to_project(
-                    key, value
-                )
-            except ValueError as e:
-                raise e
 
-            cleaned_fields.append((field_name, value))
+            cleaned_fields.append((key, value))
 
         # divide fields on groups by their values
         # (ONLY group, EXCLUDE group etc.) and add them to _loaded_fields
