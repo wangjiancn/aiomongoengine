@@ -33,11 +33,8 @@ setup(
     install_requires=[
         "motor>=2.0.0",
         "arrow>=0.15.1",
-        "tornado==5.1.1",
         "pymongo>=3.10,<4",
-        "six",
         "typing-extensions",
-        "easydict"
     ],
     extras_require={
         'dev': ['pytest', 'coverage', 'pytest-asyncio', 'autopep8']
