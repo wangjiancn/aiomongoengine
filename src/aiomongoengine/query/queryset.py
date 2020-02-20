@@ -382,7 +382,7 @@ class QuerySet(object):
         _raw_order_fields = []
         for field in fields:
             if field.startswith('-'):
-                _raw_order_fields.append((field, -1))
+                _raw_order_fields.append((field[1:], -1))
             else:
                 _raw_order_fields.append((field, 1))
 
