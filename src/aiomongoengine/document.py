@@ -53,11 +53,11 @@ class BaseDocument(object):
         self._data = {}  # storage document field and value
         self.is_partly_loaded = _is_partly_loaded
         self._reference_loaded_fields = _reference_loaded_fields or {}
+        self._dynamic_fields = {}
 
         for key, value in kw.items():
             if key not in self._fields:
-                self._fields[key] = DynamicField(db_field=key)
-                setattr(self, key, DynamicField(db_field=key))
+                self._dynamic_fields[key] = DynamicField(db_field=key)
             setattr(self, key, value)
 
     @classmethod
@@ -113,6 +113,8 @@ class BaseDocument(object):
             if field.sparse and value is None:
                 continue
             data[field.db_field] = field.to_son(value)
+        for name in self._dynamic_fields:
+            data[name] = getattr(self, name, None)
         if self.id is None:
             del data['_id']
         return data
