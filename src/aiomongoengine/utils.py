@@ -80,7 +80,7 @@ def _import_class(cls_name):
     if cls_name in _class_registry_cache:
         return _class_registry_cache.get(cls_name)
 
-    doc_classes = ("Document", "BaseDocument")
+    doc_classes = ("Document", "BaseDocument", "EmbeddedDocument")
 
     # Field Classes
     if not _field_list_cache:
@@ -101,3 +101,7 @@ def _import_class(cls_name):
         _class_registry_cache[cls] = getattr(module, cls)
 
     return _class_registry_cache.get(cls_name)
+
+
+async def async_iteritems(async_iterator):
+    return [i async for i in async_iterator]
