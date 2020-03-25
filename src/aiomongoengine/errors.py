@@ -1,6 +1,10 @@
 import re
 
 
+class ConnectionError(Exception):
+    pass
+
+
 class ValidationError(AssertionError):
     errors = {}
     field_name = None
@@ -41,10 +45,6 @@ class ValidationError(AssertionError):
             return {}
 
         return build_dict(self.errors)
-
-
-class ConnectionError(Exception):
-    pass
 
 
 class InvalidDocumentError(ValueError):
@@ -101,3 +101,51 @@ class UniqueKeyViolationError(RuntimeError):
             error_type=groups['error_type'],
             index_name=groups['index_name'], instance_type=instance_type
         )
+
+
+class FieldDoesNotExist(Exception):
+    """Raised when trying to set a field
+    not declared in a :class:`aiomongoengine.Document`
+    or an :class:`~aiomongoengine.EmbeddedDocument`.
+
+    To avoid this behavior on data loading,
+    you should set the :attr:`strict` to ``False``
+    in the :attr:`meta` dictionary.
+    """
+
+
+class OperationError(Exception):
+    pass
+
+
+class LookUpError(AttributeError):
+    pass
+
+
+class DeprecatedError(Exception):
+    """Raise when a user uses a feature that has been Deprecated"""
+    pass
+
+
+class NotUniqueError(OperationError):
+    pass
+
+
+class BulkWriteError(OperationError):
+    pass
+
+
+class SaveConditionError(OperationError):
+    pass
+
+
+class NotRegistered(Exception):
+    pass
+
+
+class InvalidQueryError(Exception):
+    pass
+
+
+class OperationError(Exception):
+    pass
