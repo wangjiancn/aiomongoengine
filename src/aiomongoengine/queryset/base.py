@@ -14,7 +14,6 @@ from warnings import warn
 import pymongo
 import pymongo.errors
 import six
-from aiomongoengine import Q
 from aiomongoengine.base.common import get_document
 from aiomongoengine.context_managers import set_write_concern
 from aiomongoengine.errors import BulkWriteError
@@ -23,13 +22,13 @@ from aiomongoengine.errors import LookUpError
 from aiomongoengine.errors import NotUniqueError
 from aiomongoengine.errors import OperationError
 from aiomongoengine.query_builder.field_list import QueryFieldList
+from aiomongoengine.query_builder.node import Q
 from aiomongoengine.query_builder.node import QNode
 from aiomongoengine.utils import _import_class
 from aiomongoengine.utils import async_iteritems
 from bson import SON
 from bson import json_util
 from bson.code import Code
-from motor.core import AgnosticCursor
 from pymongo import WriteConcern
 from pymongo.collection import ReturnDocument
 from pymongo.common import validate_read_preference
@@ -37,6 +36,7 @@ from pymongo.common import validate_read_preference
 from ..fields.base_field import BaseField
 
 if TYPE_CHECKING:
+    from motor.core import AgnosticCursor
     from aiomongoengine import Document
 
 __all__ = ("BaseQuerySet", "DO_NOTHING", "NULLIFY", "CASCADE", "DENY", "PULL")
@@ -47,51 +47,6 @@ NULLIFY = 1
 CASCADE = 2
 DENY = 3
 PULL = 4
-
-QUERY_OPERATORS = {}
-UPDATE_OPERATORS = {}
-STRING_OPERATORS = {}
-
-
-class QueryOperator(object):
-    op = None
-
-    def get_value(self, field, raw_value):
-        if field is None or not isinstance(field, (BaseField,)):
-            return raw_value
-
-        return field.to_query(raw_value)
-
-    def to_query(self, *args, **kwargs):
-        raise NotImplementedError()
-
-
-class UpdateOperator(object):
-    op = None
-
-    def to_update(self, *args, **kwargs):
-        raise NotImplementedError()
-
-
-def add_string_operator(cls: QueryOperator):
-    op = cls.op
-    if cls.op is not None and not STRING_OPERATORS.get(cls.op):
-        STRING_OPERATORS[op] = cls
-    return cls
-
-
-def add_update_operator(cls: QueryOperator):
-    op = cls.op
-    if cls.op is not None and not UPDATE_OPERATORS.get(cls.op):
-        UPDATE_OPERATORS[op] = cls
-    return cls
-
-
-def add_query_operator(cls: QueryOperator):
-    op = cls.op
-    if cls.op is not None and not QUERY_OPERATORS.get(cls.op):
-        QUERY_OPERATORS[op] = cls
-    return cls
 
 
 # noinspection PyUnresolvedReferences
