@@ -20,8 +20,7 @@ DEFAULT_PORT = 27017
 registered_collections = {}  # type: Dict[str, 'Document']
 _connection_settings = {}  # type: Dict[str, Dict[str, Union[str, int]]] 
 _connections = {}  # type: Dict[str, 'AsyncIOMotorClient']
-_default_dbs = {}  # type:  Dict[str, 'AsyncIOMotorClient'] 
-_dbs = {}  # type:  Dict[str, 'AsyncIOMotorClient'] 
+_dbs = {}  # type:  Dict[str, 'AsyncIOMotorClient']
 
 READ_PREFERENCE = ReadPreference.PRIMARY
 
@@ -202,11 +201,11 @@ def register_connection(
         name=name,
         host=host,
         port=port,
-        readPreference=read_preference or kwargs.get('readPreference'),
+        read_preference=kwargs.pop('readPreference', read_preference),
         username=username,
         password=password,
-        authentication_source=authentication_source or kwargs.get('authSource'),
-        authentication_mechanism=authentication_mechanism or kwargs.get('authMechanism'),
+        authentication_source=kwargs.pop('authSource', authentication_source),
+        authentication_mechanism=kwargs.pop('authMechanism', authentication_mechanism),
         **kwargs
     )
     _connection_settings[alias] = conn_settings
@@ -263,70 +262,28 @@ def get_connection(
             msg = 'Connection with alias "%s" has not been defined' % alias
         raise ConnectionFailure(msg)
 
-    def _clean_settings(settings_dict):
-        irrelevant_fields_set = {
-            "name",
-            "username",
-            "password",
-            "authentication_source",
-            "authentication_mechanism",
-        }
-        return {
-            k: v for k, v in settings_dict.items() if k not in irrelevant_fields_set
-        }
+    conn_settings = _connection_settings[alias].copy()
 
-    raw_conn_settings = _connection_settings[alias].copy()
-
-    # Retrieve a copy of the connection settings associated with the requested
-    # alias and remove the database name and authentication info (we don't
-    # care about them at this point).
-    conn_settings = _clean_settings(raw_conn_settings)
-
-    # Re-use existing connection if one is suitable.
-    existing_connection = _find_existing_connection(raw_conn_settings)
-    if existing_connection:
-        connection = existing_connection
-    else:
-        try:
-            authSource = conn_settings.get('authentication_source')
-            authMechanism = conn_settings.get('authentication_mechanism')
-            readPreference = conn_settings.get('read_preference')
-
-            connection = AsyncIOMotorClient(authSource=authSource,
-                                            authMechanism=authMechanism,
-                                            readPreference=readPreference,
-                                            **conn_settings)
-        except Exception as e:
-            raise ConnectionFailure("Cannot connect to database %s :\n%s" % (alias, e))
+    try:
+        auth_kwargs = {}
+        if conn_settings["username"] and (
+                conn_settings["password"] or
+                conn_settings["authentication_mechanism"] == "MONGODB-X509"):
+            auth_kwargs = {
+                'authentication_mechanism': conn_settings.pop('authentication_mechanism'),
+                'authSource': conn_settings.pop('authentication_source'),
+                'username': conn_settings.pop('username'),
+                'password': conn_settings.pop('password')
+            }
+            none_key = [k for k, v in auth_kwargs.items() if v is None]
+            for key in none_key:
+                del auth_kwargs[key]
+        del conn_settings['name']
+        connection = AsyncIOMotorClient(**conn_settings, **auth_kwargs)
+    except Exception as e:
+        raise ConnectionFailure("Cannot connect to database %s :\n%s" % (alias, e))
     _connections[alias] = connection
-    return _connections[alias]
-
-
-def _find_existing_connection(connection_settings):
-    """ Check if an existing connection could be reused
-
-    Iterate over all of the connection settings and if an existing connection
-    with the same parameters is suitable, return it
-
-    :param connection_settings: the settings of the new connection
-    :return: An existing connection or None
-    """
-    connection_settings_bis = (
-        (db_alias, settings.copy())
-        for db_alias, settings in _connection_settings.items()
-    )
-
-    def _clean_settings(settings_dict):
-        # Only remove the name but it's important to
-        # keep the username/password/authentication_source/authentication_mechanism
-        # to identify if the connection could be shared
-        return {k: v for k, v in settings_dict.items() if k != "name"}
-
-    cleaned_conn_settings = _clean_settings(connection_settings)
-    for db_alias, connection_settings in connection_settings_bis:
-        db_conn_settings = _clean_settings(connection_settings)
-        if cleaned_conn_settings == db_conn_settings and _connections.get(db_alias):
-            return _connections[db_alias]
+    return connection
 
 
 def get_db(
@@ -336,22 +293,10 @@ def get_db(
     """Get database."""
     if reconnect:
         disconnect(alias)
-
     if alias not in _dbs:
-        conn = get_connection(alias)
-        conn_settings = _connection_settings[alias]
-        db = conn[conn_settings["name"]]
-        auth_kwargs = {"source": conn_settings["authentication_source"]}
-        if conn_settings["authentication_mechanism"] is not None:
-            auth_kwargs["mechanism"] = conn_settings["authentication_mechanism"]
-        # Authenticate if necessary
-        if conn_settings["username"] and (
-                conn_settings["password"]
-                or conn_settings["authentication_mechanism"] == "MONGODB-X509"
-        ):
-            db.authenticate(
-                conn_settings["username"], conn_settings["password"], **auth_kwargs
-            )
+        conn_setting = _connection_settings[alias].copy()
+        db_name = conn_setting['name']
+        db = _connections[alias][db_name]
         _dbs[alias] = db
     return _dbs[alias]
 
